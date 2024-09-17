@@ -36,13 +36,21 @@
 # ----------------------------------------
 postgresql_admin_username=postgres
 postgresql_admin_password={{ aap_default_password }}
+
 # If using the online (non-bundled) installer, you need to set RHN registry credentials
+{% if red_hat_user is defined %}
 registry_username={{ red_hat_user }}
 registry_password={{ red_hat_password }}
+{% else %}
+registry_auth=false
+
 # If using the bundled installer, you need to alter defaults by using:
-#bundle_install=true
+bundle_install=true
 # The bundle directory must include /bundle in the path
-#bundle_dir=<full path to the bundle directory>
+bundle_dir=/home/{{ ansible_user }}/aap_install/bundle
+{% endif %}
+
+
 # To add more decision environment images you need to set the de_extra_images variable
 #de_extra_images=[{'name': 'Custom decision environment', 'image': '<registry>/<namespace>/<image>:<tag>'}]
 # To add more execution environment images you need to set the ee_extra_images variable

@@ -4,12 +4,19 @@
   include_vars:
     file: "../vars/secrets.yml"
 
-- name: Subscribe the system
+- name: Subscribe RHEL the system
+  ansible.builtin.redhat_subscription:
+    state: present
+    activationkey: "{{ red_hat_activation_key | default(omit) }}"
+    org_id: "{{ red_hat_org_id | default(omit) }}"
+    username: "{{ red_hat_user | default(omit) }}"
+    password: "{{ red_hat_password | default(omit) }}"
   become: true
-  shell: |
-    subscription-manager register --username={{ red_hat_user }} --password={{ red_hat_password }} --force
-    subscription-manager attach
-    subscription-manager config --rhsm.manage_repos=1
+
+- name: Enable redhat.repo using subscription-manager
+  ansible.builtin.command:
+    cmd: subscription-manager config --rhsm.manage_repos=1
+  become: true
 
 - name: Prepare Image Builder server in x86_64
   become: true
@@ -22,7 +29,7 @@
   ansible.builtin.import_role:
     name: infra.osbuild.setup_server
   vars:
-    _setup_server_base_packages:  
+    _setup_server_base_packages:
       - rsync
       - osbuild-composer
       - composer-cli
@@ -37,7 +44,7 @@
       - lorax
       - pykickstart
   when: ansible_architecture == "aarch64"
-  
+
 - name: Install additional packages
   become: true
   ansible.builtin.dnf:
@@ -45,31 +52,29 @@
     name: "{{ packages }}"
   vars:
     packages:
-    - coreutils
-    - glibc-minimal-langpack
-    - pykickstart
-    - mtools
-    - xorriso
-    - genisoimage
-    - isomd5sum
-    - lorax
-    - butane
-    - rpmdevtools
-    - rpmlint
-    - yum-utils
-    - createrepo
-    - tree
-
+      - coreutils
+      - glibc-minimal-langpack
+      - pykickstart
+      - mtools
+      - xorriso
+      - genisoimage
+      - isomd5sum
+      - lorax
+      - butane
+      - rpmdevtools
+      - rpmlint
+      - yum-utils
+      - createrepo
+      - tree
 
 - name: Initiate the rpm build tree
   become: true
   shell: rpmdev-setuptree
 
-
 - name: Download RHEL ISO
   when: (rhel_iso_download_x86_64 or rhel_iso_download_aarch64) is defined and (rhel_iso_download_x86_64 or rhel_iso_download_aarch64) != False
   become: true
-  block: 
+  block:
     - name: Include secrets file with offline_token
       include_vars:
         file: "../vars/secrets.yml"
@@ -163,98 +168,96 @@
     - name: Microshift offline
       when: microshift_get_offline_images | default(true)
       block:
-          - name: Enable OCP repo on the host for Microshift
-            community.general.rhsm_repository:
-              state: enabled
-              name: "rhocp-{{ microshift_release }}-for-rhel-9-{{ ansible_architecture }}-rpms"
+        - name: Enable OCP repo on the host for Microshift
+          community.general.rhsm_repository:
+            state: enabled
+            name: "rhocp-{{ microshift_release }}-for-rhel-9-{{ ansible_architecture }}-rpms"
 
-          - name: Getting microshift-release-info package
-            ansible.builtin.shell:
-              cmd: dnf download -y microshift-release-info
-            register: _dnf_output
+        - name: Getting microshift-release-info package
+          ansible.builtin.shell:
+            cmd: dnf download -y microshift-release-info
+          register: _dnf_output
 
-            #bug with cmd output
-          - name: Getting microshift-release-info package
-            ansible.builtin.shell:
-              cmd: dnf download -y microshift-release-info
-            register: _dnf_output
+          #bug with cmd output
+        - name: Getting microshift-release-info package
+          ansible.builtin.shell:
+            cmd: dnf download -y microshift-release-info
+          register: _dnf_output
 
-          - name: Capture filename from the output
-            set_fact:
-              _microshift_release_info_string: >-
-                {{
-                  _dnf_output.stdout
-                  | regex_search('microshift-release-info-[^\n:]*')
-                  | default('')
-                  | regex_replace(':$', '')
-                }}
+        - name: Capture filename from the output
+          set_fact:
+            _microshift_release_info_string: >-
+              {{
+                _dnf_output.stdout
+                | regex_search('microshift-release-info-[^\n:]*')
+                | default('')
+                | regex_replace(':$', '')
+              }}
 
-          - name: Display captured microshift-release-info string
-            debug:
-              var: _microshift_release_info_string
+        - name: Display captured microshift-release-info string
+          debug:
+            var: _microshift_release_info_string
 
-          - name: Running rpm2cpio for the microshift-release-info package
-            ansible.builtin.shell:
-              cmd: rpm2cpio {{ _microshift_release_info_string }} | cpio -idmv
+        - name: Running rpm2cpio for the microshift-release-info package
+          ansible.builtin.shell:
+            cmd: rpm2cpio {{ _microshift_release_info_string }} | cpio -idmv
 
-          - name: Be sure that jq is installed
-            ansible.builtin.dnf:
-              name: jq
+        - name: Be sure that jq is installed
+          ansible.builtin.dnf:
+            name: jq
 
-          - name: Create /opt/files directory if it does not exist
-            ansible.builtin.file:
-              path:  "/opt/files"
-              state: directory
+        - name: Create /opt/files directory if it does not exist
+          ansible.builtin.file:
+            path: "/opt/files"
+            state: directory
 
-          - name: Clear previous Microshift images - TOML
-            ansible.builtin.file:
-              path: /opt/files/blueprint-microshift-embedded.toml
-              state: absent
+        - name: Clear previous Microshift images - TOML
+          ansible.builtin.file:
+            path: /opt/files/blueprint-microshift-embedded.toml
+            state: absent
 
-          - name: Clear previous Microshift images - YAML
-            ansible.builtin.file:
-              path: /opt/files/blueprint-microshift-embedded.yaml
-              state: absent
-           
-          - name: Extracting the Microshift images to TOML
-            ansible.builtin.shell:
-              cmd: jq -r '.images | .[] | ("[[containers]]\nsource = \"" + . + "\"\n")' "./usr/share/microshift/release/release-{{ ansible_architecture }}.json" >> "/opt/files/blueprint-microshift-embedded.toml"
+        - name: Clear previous Microshift images - YAML
+          ansible.builtin.file:
+            path: /opt/files/blueprint-microshift-embedded.yaml
+            state: absent
 
-          - name: Extracting the Microshift images to YAML
-            ansible.builtin.shell:
-              cmd: |
-                jq -r '.images | to_entries | map("  - \(.value)") | join("\n")' "./usr/share/microshift/release/release-{{ ansible_architecture }}.json" \
-                | awk 'BEGIN {print "builder_compose_containers:"} {print}' \
-                >> "/opt/files/blueprint-microshift-embedded.yaml"
+        - name: Extracting the Microshift images to TOML
+          ansible.builtin.shell:
+            cmd: jq -r '.images | .[] | ("[[containers]]\nsource = \"" + . + "\"\n")' "./usr/share/microshift/release/release-{{ ansible_architecture }}.json" >> "/opt/files/blueprint-microshift-embedded.toml"
 
+        - name: Extracting the Microshift images to YAML
+          ansible.builtin.shell:
+            cmd: |
+              jq -r '.images | to_entries | map("  - \(.value)") | join("\n")' "./usr/share/microshift/release/release-{{ ansible_architecture }}.json" \
+              | awk 'BEGIN {print "builder_compose_containers:"} {print}' \
+              >> "/opt/files/blueprint-microshift-embedded.yaml"
 
-          - name: Create ../files directory on localhost if it doesn't exist
-            become: false
-            delegate_to: localhost
-            ansible.builtin.file:
-              path: "../files"
-              state: directory
+        - name: Create ../files directory on localhost if it doesn't exist
+          become: false
+          delegate_to: localhost
+          ansible.builtin.file:
+            path: "../files"
+            state: directory
 
-          - name: Fetch Microshift embedded images TOLM file from remote server to localhost
-            ansible.builtin.fetch:
-              src: "/opt/files/blueprint-microshift-embedded.toml"
-              dest: "../files/microshift-embedded-images.toml"
-              flat: yes
-              validate_checksum: no
-              fail_on_missing: no
+        - name: Fetch Microshift embedded images TOLM file from remote server to localhost
+          ansible.builtin.fetch:
+            src: "/opt/files/blueprint-microshift-embedded.toml"
+            dest: "../files/microshift-embedded-images.toml"
+            flat: yes
+            validate_checksum: no
+            fail_on_missing: no
 
-          # This repo is just to download microshift_release_info
-          - name: Disable OCP repo 
-            community.general.rhsm_repository:
-              state: disabled
-              name: "rhocp-{{ microshift_release }}-for-rhel-9-{{ ansible_architecture }}-rpms"
-
+        # This repo is just to download microshift_release_info
+        - name: Disable OCP repo
+          community.general.rhsm_repository:
+            state: disabled
+            name: "rhocp-{{ microshift_release }}-for-rhel-9-{{ ansible_architecture }}-rpms"
 
     - name: Add pull-secret to Image Builder
       become: true
       when: pull_secret | default(false)
       block:
-        - name: Include secrets file with pull-secret 
+        - name: Include secrets file with pull-secret
           include_vars:
             file: "../vars/secrets.yml"
 
@@ -275,10 +278,10 @@
               auth_file_path = "/etc/osbuild-worker/pull-secret.json"
             dest: /etc/osbuild-worker/osbuild-worker.toml
 
-#        - name: Restart osbuild-worker@1.service
-#          systemd:
-#            name: osbuild-worker@1
-#            state: restarted
+        #        - name: Restart osbuild-worker@1.service
+        #          systemd:
+        #            name: osbuild-worker@1
+        #            state: restarted
 
         # DOCUMENTATION NOW SAYS THAT YOU HAVE TO REBOOT THE SERVER: https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/4.14/html/installing/microshift-embed-in-rpm-ostree-for-offline-use#microshift-embed-microshift-update-osbuilder-worker_microshift-embed-rpm-ostree-offline-use
         - name: Reboot (as per indicated in the documentation)
@@ -293,7 +296,6 @@
 
         - name: Ping the target host
           ping:
-          
+
         - debug:
             msg: "Reboot done"
- 

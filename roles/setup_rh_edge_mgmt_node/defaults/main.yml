@@ -1,6 +1,6 @@
 ---
 #### ENCRYPTED WITH ANSIBLE VAULT IN secrets.yaml ->  ansible-vault create vars/secrets.yml
-#pull_secret:  
+#pull_secret:
 #offline_token:  #   https://access.redhat.com/articles/3626371#bgenerating-an-access-tokenb-4
 #red_hat_user:
 #red_hat_password:
@@ -15,7 +15,6 @@ microshift_get_offline_images: true
 rhel_iso_download_x86_64: 6a9f135b8836edd06aba1b94fd6d0e72bd97b4115a3d2a61496b33f73e0a13a5
 rhel_iso_download_aarch64: 7de492ee2cda87a1f88ca36920f7676c62a7a70920f3305bda90c39359a86017
 
-
 ### FDO
 include_fdo: true
 fdo_manufacturing_port: 18080
@@ -28,17 +27,19 @@ report_to_rendezvous_endpoint_enabled: true
 include_aap: true
 node_fqdn: edge-manager.demo
 aap_inventory_template: ../templates/aap_inventory.j2
-aap_sha_value: 714de904596f2f3312b8804eee0d2fdce6842ac2108dbf718f2107ef61d1598d   ## Tech Preview: Ansible Automation Platform 2.4 Containerized Setup
-#controller_postinstall_repo_url: ""
+# aap_sha_value: 714de904596f2f3312b8804eee0d2fdce6842ac2108dbf718f2107ef61d1598d   ## Tech Preview: Ansible Automation Platform 2.4 Containerized Setup
+aap_sha_value: 0781cab21cd21992a22bb8ed6f9b1018dff0d092d5882e1e9aafbd48337f6662 ## Tech Preview: Ansible Automation Platform 2.4 Containerized Setup Bundle
+# controller_postinstall_repo_url: ""
 aap_default_password: R3dh4t1!
-
+# container_config_by_file says if ~/.docker/config.json should be created to authenticate to container registry
+container_config_by_file: false
+container_config_file_local: "{{ lookup('env', 'HOME') }}/.docker/config.json"
 
 ### Gitea
 include_gitea: true
 gitea_version: "1.21.7"
 gitea_user: admin
 gitea_password: R3dh4t1!
-
 
 # VPN
 include_vpn: true

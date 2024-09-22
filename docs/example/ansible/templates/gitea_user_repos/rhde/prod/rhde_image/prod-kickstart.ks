@@ -72,9 +72,8 @@ conn %default
 conn edge-$MAC_ADDRESS_FORMAT
     encapsulation=yes
     left=%defaultroute
-    leftid=$MAC_ADDRESS_FORMAT
+    leftid=@$MAC_ADDRESS_FORMAT
     right=${IP_AAP_PUBLIC}
-    rightid=${IP_AAP_PRIVATE}
     authby=secret
     auto=start
     dpdaction=restart
@@ -93,7 +92,7 @@ cat > /etc/ipsec.secrets <<EOF
 EOF
 
 systemctl enable ipsec
-systemctl start ipsec 
+systemctl start ipsec
 
 
 # Add masquerade rule for the private IP
